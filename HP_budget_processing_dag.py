@@ -1,4 +1,3 @@
-
 import os
 import sqlite3
 import pandas as pd
@@ -10,9 +9,10 @@ from airflow.operators.python_operator import PythonOperator
 
 
 def process_data():
+    '''Generates a processed dataset/dataframe with all all data cleaning and other data manupilation'''
 
     def clean_data(file):
-        '''This function reads the csv file, performs data pre-processing w.r.t to rows, columns and returns a clean data set '''
+        ''' Reads the input CSV file, performs data pre-processing on rows and columns, and returns a cleaned DataFrame.'''
         df = pd.read_csv(file, header=None)
         df = df.drop([0, 1, 3])
 
@@ -30,8 +30,8 @@ def process_data():
         return df
 
     def split_columns_and_rename(df):
-        '''This function splits the desired columns (in this case 'DmdCd', HOA) w.r.t '-' delimiter,
-            renames the splitted columns and returns the re-orderd dataframe'''
+        '''Splits the desired columns (in this case 'DmdCd', HOA) w.r.t '-' delimiter,
+            renames the split columns and returns the re-orderd dataframe'''
 
         df[['DemandCode', 'Demand']] = df['DmdCd'].str.split(
             '-', n=1, expand=True)
@@ -62,12 +62,11 @@ def process_data():
         return df
 
     def write_to_csv(df, output_file):
-        '''This function writes the processed data set to a new output file'''
-
+        '''Writes the processed dataframe to a new output file'''
         df.to_csv(output_file, index=False)
 
     def runner():
-        '''This function get the inputs from the previous functions and returns the processed datafarme'''
+        '''Orchestrates the data processing steps using the above functions and returns the final processed DataFrame.'''
 
         input_file = Path(__file__).parent / "himkosh_data.csv"
         output_file = Path(__file__).parent / "HP_OLTIS_Sanctioned_Budget.csv"
@@ -78,51 +77,42 @@ def process_data():
         write_to_csv(budget_data, output_file)
         df = pd.read_csv(output_file)
         return (df)
-    print(runner())
 
 
 logging.info('Data Processing')
 
 
 def load_data():
+    '''Accepts processed data file from the process_data(), creates a database & loads the data into specific tables'''
 
     def load_csv_data(filename):
-        '''This function loads andf returns the csv file'''
-
+        '''Loads the data from a CSV file using pandas and returns a DataFrame.'''
         return pd.read_csv(filename)
 
     def create_database_table(conn, data, table_name):
-        '''This function creates a table & if there are any data in that table, the function replaces with the new data'''
-
+        '''Creates an SQLite database table. If the table already exists, it will be replaced with the new data.'''
         data.to_sql(table_name, conn, if_exists='replace', index=False)
         conn.commit()
 
     input_csv_filename = os.path.join(os.path.dirname(
         __file__), "HP_OLTIS_Sanctioned_Budget.csv")
     db_filename = "assignment.db"
-
     table_name = os.path.splitext(os.path.basename(input_csv_filename))[0]
-
     data = load_csv_data(input_csv_filename)
-
-    # Create or connect to the SQLite database
     conn = sqlite3.connect(db_filename)
     cursor = conn.cursor()
-
-    # Create table and insert data
     create_database_table(conn, data, table_name)
     conn.close()
 
 
 logging.info('Data Loading task completed')
 
-# Create DAG
+
 with DAG('HP_budget_processing_dag',
          start_date=datetime(2023, 8, 12),
          schedule_interval='@daily',
          catchup=False) as dag:
 
-    # Define Task
     process_data_task = PythonOperator(
         task_id='process_data',
         python_callable=process_data,
