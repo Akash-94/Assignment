@@ -1,17 +1,19 @@
+# -*- coding: utf-8 -*-
 import scrapy
-import csv
+from pathlib import Path
 from scrapy import FormRequest
+import csv
 
 
 class BudgetSpider(scrapy.Spider):
     name = 'budget'
-    allowed_domains = ['himkosh.nic.in']
     start_urls = [
-        "https://himkosh.nic.in/eHPOLTIS/PublicReports/wfrmBudgetAllocationbyFD.aspx"]
+        'http://https://himkosh.nic.in/eHPOLTIS/PublicReports/wfrmBudgetAllocationbyFD.aspx/']
 
     def start_requests(self):
-        for url in self.start_urls:
-            yield scrapy.Request(url=url, callback=self.parse)
+        urls = "https://himkosh.nic.in/eHPOLTIS/PublicReports/wfrmBudgetAllocationbyFD.aspx"
+        for url in urls:
+            yield scrapy.Request(url=urls, callback=self.parse)
 
     def parse(self, response):
         post_data = {
@@ -31,28 +33,13 @@ class BudgetSpider(scrapy.Spider):
         yield FormRequest.from_response(response, url=response.url, formdata=post_data, callback=self.parse_results)
 
     def parse_results(self, response):
-        for row in response.xpath('//*[@id="hodAllocation"]/table/tbody/tr'):
-            data = row.xpath('td/text()').getall()
-            yield {'result': data}
+        rows = response.xpath('//*[@id="hodAllocation"]/tr')
+        for row in rows[1:]:  # Skip the header row
+            data = row.xpath('.//text()').getall()
+            yield {
+                'result_data': data
+            }
 
-            with open('budget_data.csv', 'a', encoding='utf-8') as csv_file:
-                csv_writer = csv.writer(csv_file)
-                csv_writer.writerow(data)
-        # for row in response.css("div#hodAllocation tbody tr"):
-        #     data = row .css("td.success").getall()
-        # yield {
-        # 'result_data': data
-        # 'DmdCd': data[0],
-        # 'HOA': data[1],
-        # 'Sanction Budget (April)': data[2],
-        # 'Addition': data[3],
-        # 'Saving': data[4],
-        # 'Revised Budget (A)': data[5],
-        # 'Expenditure (within selected period) (B)': data[6],
-        # 'Balance (A-B)': data[7]
-        # }
-
-        # page = response.url.split("/")[-1]
-        # filename = f"budget-{page}.html"
-        # Path(filename).write_bytes(response.body)
-        # self.log(f"Saved file {filename}")
+        with open('himkosh.csv', 'a', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([data])
