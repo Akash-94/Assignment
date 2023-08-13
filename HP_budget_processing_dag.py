@@ -3,6 +3,7 @@ import os
 import sqlite3
 import pandas as pd
 import logging
+from pathlib import Path
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
@@ -68,21 +69,16 @@ def process_data():
     def runner():
         '''This function get the inputs from the previous functions and returns the processed datafarme'''
 
-        input_file = os.path.join(os.path.dirname(
-            'C:/Users/acess/Desktop/materials/dags/'), "himkosh_data.csv")
-        output_file = os.path.join(os.path.dirname(
-            'C:/Users/acess/Desktop/materials/dags/'), "HP_OLTIS_Sanctioned_Budget.csv")
+        input_file = Path(__file__).parent / "himkosh_data.csv"
+        output_file = Path(__file__).parent / "HP_OLTIS_Sanctioned_Budget.csv"
 
         budget_data = clean_data(input_file)
         budget_data = split_columns_and_rename(budget_data)
 
         write_to_csv(budget_data, output_file)
         df = pd.read_csv(output_file)
-
         return (df)
-
-    if __name__ == "__main__":
-        runner()
+    print(runner())
 
 
 logging.info('Data Processing')
@@ -101,33 +97,24 @@ def load_data():
         data.to_sql(table_name, conn, if_exists='replace', index=False)
         conn.commit()
 
-    def runner():
-        input_csv_filename = "HP_OLTIS_Sanctioned_Budget.csv"
-        db_filename = "assignment.db"
+    input_csv_filename = os.path.join(os.path.dirname(
+        __file__), "HP_OLTIS_Sanctioned_Budget.csv")
+    db_filename = "assignment.db"
 
-        table_name = os.path.splitext(os.path.basename(input_csv_filename))[0]
+    table_name = os.path.splitext(os.path.basename(input_csv_filename))[0]
 
-        data = load_csv_data(input_csv_filename)
+    data = load_csv_data(input_csv_filename)
 
-        # Create or connect to the SQLite database
-        conn = sqlite3.connect(db_filename)
-        cursor = conn.cursor()
+    # Create or connect to the SQLite database
+    conn = sqlite3.connect(db_filename)
+    cursor = conn.cursor()
 
-        # Create table and insert data
-        create_database_table(conn, data, table_name)
-
-        # cursor.execute(f'SELECT * FROM {table_name}')
-        # rows = cursor.fetchall()
-        # for row in rows:
-        #     print(row)
-
-        conn.close()
-
-    if __name__ == "__main__":
-        runner()
+    # Create table and insert data
+    create_database_table(conn, data, table_name)
+    conn.close()
 
 
-logging.info('Data Loading')
+logging.info('Data Loading task completed')
 
 # Create DAG
 with DAG('HP_budget_processing_dag',
